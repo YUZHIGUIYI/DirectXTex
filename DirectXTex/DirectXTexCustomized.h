@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "DirectXTexP.h"
+#include "DirectXTex.h"
 
 namespace DirectX
 {
@@ -24,5 +24,13 @@ namespace DirectX
             _In_ D3D12_RESOURCE_STATES beforeState = D3D12_RESOURCE_STATE_RENDER_TARGET,
             _In_ D3D12_RESOURCE_STATES afterState = D3D12_RESOURCE_STATE_RENDER_TARGET) noexcept;
 
+    HRESULT __cdecl CaptureBufferDeferred(
+            _In_ ID3D12Device* device, _In_ ID3D12GraphicsCommandList* pCommandList, _In_ ID3D12Resource* pSource,
+            CaptureTextureDesc &captureTextureDesc,
+            _In_ D3D12_RESOURCE_STATES beforeState = D3D12_RESOURCE_STATE_RENDER_TARGET,
+            _In_ D3D12_RESOURCE_STATES afterState = D3D12_RESOURCE_STATE_RENDER_TARGET) noexcept;
+
     HRESULT __cdecl SaveToDDSFileImmediately(_In_ const CaptureTextureDesc& captureTextureDesc, _In_ DDS_FLAGS flags, _In_z_ const wchar_t* szFile) noexcept;
+
+    HRESULT __cdecl SaveToBinFileImmediately(_In_ const CaptureTextureDesc& captureTextureDesc, _In_z_ const wchar_t* szFile) noexcept;
 }

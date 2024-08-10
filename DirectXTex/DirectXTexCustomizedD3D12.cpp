@@ -3,6 +3,7 @@
 //
 
 #include "DirectXTexCustomized.h"
+#include <fstream>
 
 #ifdef __clang__
 #pragma clang diagnostic push
@@ -417,5 +418,126 @@ namespace DirectX
         SaveToDDSFile(image, 1, mdata, flags, szFile);
 
         return S_OK;
+    }
+
+    _Use_decl_annotations_
+    HRESULT __cdecl CaptureBufferDeferred(
+            _In_ ID3D12Device* device, _In_ ID3D12GraphicsCommandList* pCommandList, _In_ ID3D12Resource* pSource,
+            CaptureTextureDesc &captureTextureDesc,
+            _In_ D3D12_RESOURCE_STATES beforeState,
+            _In_ D3D12_RESOURCE_STATES afterState) noexcept
+    {
+        using Microsoft::WRL::ComPtr;
+
+        HRESULT result = S_OK;
+
+        if (!device || !pCommandList || !pSource)
+            return E_INVALIDARG;
+
+#if defined(_MSC_VER) || !defined(_WIN32)
+        auto const desc = pSource->GetDesc();
+#else
+        D3D12_RESOURCE_DESC tmpDesc;
+        auto const& desc = *pSource->GetDesc(&tmpDesc);
+#endif
+        if (desc.Dimension != D3D12_RESOURCE_DIMENSION_BUFFER)
+            return E_INVALIDARG;
+
+        captureTextureDesc.numberOfResources = 1;
+        captureTextureDesc.numberOfPlanes = D3D12GetFormatPlaneCount(device, desc.Format);
+        if (!captureTextureDesc.numberOfPlanes)
+            return E_INVALIDARG;
+        captureTextureDesc.isCubeMap = false;
+        captureTextureDesc.layoutBuff = nullptr;
+        captureTextureDesc.capturedResourceDesc = desc;
+
+        D3D12_HEAP_PROPERTIES sourceHeapProperties{};
+        result = pSource->GetHeapProperties(&sourceHeapProperties, nullptr);
+        if (SUCCEEDED(result) && sourceHeapProperties.Type == D3D12_HEAP_TYPE_READBACK)
+        {
+            // Handle case where the source is already a staging texture we can use directly
+            captureTextureDesc.pStaging = pSource;
+            pSource->AddRef();
+            return S_OK;
+        }
+
+        D3D12_RESOURCE_DESC staging_resource_desc{};
+        staging_resource_desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+        staging_resource_desc.Alignment = 0;
+        staging_resource_desc.Width = desc.Width;
+        staging_resource_desc.Height = 1;
+        staging_resource_desc.DepthOrArraySize = 1;
+        staging_resource_desc.MipLevels = 1;
+        staging_resource_desc.Format = DXGI_FORMAT_UNKNOWN;
+        staging_resource_desc.SampleDesc.Count = 1;
+        staging_resource_desc.SampleDesc.Quality = 0;
+        staging_resource_desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+        staging_resource_desc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+        D3D12_HEAP_PROPERTIES staging_heap_props{};
+        staging_heap_props.Type = D3D12_HEAP_TYPE_READBACK;
+        staging_heap_props.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+        staging_heap_props.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+        staging_heap_props.CreationNodeMask = 1;
+        staging_heap_props.VisibleNodeMask = 1;
+
+        // Create a staging texture
+        result = device->CreateCommittedResource(
+                &staging_heap_props,
+                D3D12_HEAP_FLAG_NONE,
+                &staging_resource_desc,
+                D3D12_RESOURCE_STATE_COPY_DEST,
+                nullptr,
+                IID_ID3D12Resource,
+                reinterpret_cast<void **>(captureTextureDesc.pStaging.GetAddressOf()));
+        if (FAILED(result))
+        {
+            return result;
+        }
+
+        assert(captureTextureDesc.pStaging != nullptr);
+
+        // Transition the resource if necessary
+        TransitionResource(pCommandList, pSource, beforeState, D3D12_RESOURCE_STATE_COPY_SOURCE);
+
+        // Copy resource
+        pCommandList->CopyResource(captureTextureDesc.pStaging.Get(), pSource);
+
+        // Transition the resource to the next state
+        TransitionResource(pCommandList, pSource, D3D12_RESOURCE_STATE_COPY_SOURCE, afterState);
+
+        return result;
+    }
+
+    _Use_decl_annotations_
+    HRESULT SaveToBinFileImmediately(_In_ const CaptureTextureDesc& captureTextureDesc, _In_z_ const wchar_t* szFile) noexcept
+    {
+        if (!captureTextureDesc.pStaging)
+            return E_INVALIDARG;
+
+        HRESULT result = S_OK;
+
+        // Mapping resource, and write data to file
+        D3D12_RANGE read_range{ 0, static_cast<size_t>(captureTextureDesc.capturedResourceDesc.Width) };
+        D3D12_RANGE write_range{ 0, 0 };
+        void *mapped_data = nullptr;
+        result = captureTextureDesc.pStaging->Map(0, &read_range, &mapped_data);
+        if (FAILED(result))
+        {
+            return result;
+        }
+
+        std::ofstream output_file{ szFile, std::ios::binary };
+        if (output_file.is_open())
+        {
+            output_file.write(reinterpret_cast<char *>(mapped_data), static_cast<std::streamsize>(captureTextureDesc.capturedResourceDesc.Width));
+        } else
+        {
+            result = E_ACCESSDENIED;
+        }
+
+        captureTextureDesc.pStaging->Unmap(0, &write_range);
+
+        return result;
     }
 }
