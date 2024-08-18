@@ -8,6 +8,7 @@
 
 namespace DirectX
 {
+    // Helper structure
     struct CaptureTextureDesc
     {
         Microsoft::WRL::ComPtr<ID3D12Resource> pStaging = nullptr;
@@ -18,19 +19,30 @@ namespace DirectX
         bool isCubeMap = false;
     };
 
+    // Copy texture to staging buffer, only record commands, support depth-stencil buffer by setting enableDepthCheck = false.
     HRESULT __cdecl CaptureTextureDeferred(
-            _In_ ID3D12Device* device, _In_ ID3D12GraphicsCommandList* pCommandList, _In_ ID3D12Resource* pSource,
-            CaptureTextureDesc &captureTextureDesc, _In_ bool isCubeMap,
+            _In_ ID3D12Device *device, _In_ ID3D12GraphicsCommandList *pCommandList, _In_ ID3D12Resource *pSource,
+            _In_ CaptureTextureDesc &captureTextureDesc, _In_ bool isCubeMap, _In_ bool enableDepthCheck = true,
             _In_ D3D12_RESOURCE_STATES beforeState = D3D12_RESOURCE_STATE_RENDER_TARGET,
             _In_ D3D12_RESOURCE_STATES afterState = D3D12_RESOURCE_STATE_RENDER_TARGET) noexcept;
 
+    // Copy buffer to staging buffer, only record commands.
     HRESULT __cdecl CaptureBufferDeferred(
-            _In_ ID3D12Device* device, _In_ ID3D12GraphicsCommandList* pCommandList, _In_ ID3D12Resource* pSource,
-            CaptureTextureDesc &captureTextureDesc,
+            _In_ ID3D12Device *device, _In_ ID3D12GraphicsCommandList *pCommandList, _In_ ID3D12Resource *pSource,
+            _In_ CaptureTextureDesc &captureTextureDesc,
             _In_ D3D12_RESOURCE_STATES beforeState = D3D12_RESOURCE_STATE_RENDER_TARGET,
             _In_ D3D12_RESOURCE_STATES afterState = D3D12_RESOURCE_STATE_RENDER_TARGET) noexcept;
 
-    HRESULT __cdecl SaveToDDSFileImmediately(_In_ const CaptureTextureDesc& captureTextureDesc, _In_ DDS_FLAGS flags, _In_z_ const wchar_t* szFile) noexcept;
+    // Copy buffer to staging buffer immediately, and dump staging buffer data as a binary file.
+    HRESULT __cdecl CaptureBufferImmediately(_In_ ID3D12CommandQueue *pCommandQueue,
+                                    _In_ ID3D12Resource *pSource,
+                                    _In_z_ const wchar_t *szFile,
+                                    _In_ D3D12_RESOURCE_STATES beforeState = D3D12_RESOURCE_STATE_RENDER_TARGET,
+                                    _In_ D3D12_RESOURCE_STATES afterState = D3D12_RESOURCE_STATE_RENDER_TARGET) noexcept;
 
-    HRESULT __cdecl SaveToBinFileImmediately(_In_ const CaptureTextureDesc& captureTextureDesc, _In_z_ const wchar_t* szFile) noexcept;
+    // Dump staging buffer data as a dds-format file, must firstly invoke CaptureTextureDeferred function and wait for the commands to finish executing.
+    HRESULT __cdecl SaveToDDSFileImmediately(_In_ const CaptureTextureDesc &captureTextureDesc, _In_ DDS_FLAGS flags, _In_z_ const wchar_t *szFile) noexcept;
+
+    // Dump staging buffer data as a binary file, must firstly invoke CaptureBufferDeferred function and wait for the commands to finish executing.
+    HRESULT __cdecl SaveToBinFileImmediately(_In_ const CaptureTextureDesc &captureTextureDesc, _In_z_ const wchar_t *szFile) noexcept;
 }
