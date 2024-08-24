@@ -38,5 +38,3 @@ x64
 /wiki
 /out
 /CMakeUserPresets.json
-/.idea
-/cmake-build-debug
