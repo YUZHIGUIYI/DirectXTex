@@ -19,10 +19,17 @@ namespace DirectX
         bool isCubeMap = false;
     };
 
-    // Copy texture to staging buffer, only record commands, support depth-stencil buffer by setting enableDepthCheck = false.
+    // Copy texture (include all subresources) to staging buffer, only record commands, support depth-stencil buffer by setting enableDepthCheck = false.
     HRESULT __cdecl CaptureTextureDeferred(
             _In_ ID3D12Device *device, _In_ ID3D12GraphicsCommandList *pCommandList, _In_ ID3D12Resource *pSource,
             _In_ CaptureTextureDesc &captureTextureDesc, _In_ bool isCubeMap, _In_ bool enableDepthCheck = true,
+            _In_ D3D12_RESOURCE_STATES beforeState = D3D12_RESOURCE_STATE_RENDER_TARGET,
+            _In_ D3D12_RESOURCE_STATES afterState = D3D12_RESOURCE_STATE_RENDER_TARGET) noexcept;
+
+    // Copy texture subresource to staging buffer, only record commands.
+    HRESULT __cdecl CaptureTextureSubresourceDeferred(
+            _In_ ID3D12Device *device, _In_ ID3D12GraphicsCommandList *pCommandList, _In_ ID3D12Resource *pSource,
+            _In_ const D3D12_RENDER_TARGET_VIEW_DESC &rtvDesc, _In_ CaptureTextureDesc &captureTextureDesc, _In_ bool isCubeMap,
             _In_ D3D12_RESOURCE_STATES beforeState = D3D12_RESOURCE_STATE_RENDER_TARGET,
             _In_ D3D12_RESOURCE_STATES afterState = D3D12_RESOURCE_STATE_RENDER_TARGET) noexcept;
 
