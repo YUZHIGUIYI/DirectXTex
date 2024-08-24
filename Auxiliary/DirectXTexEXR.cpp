@@ -410,7 +410,7 @@ HRESULT DirectX::LoadFromEXRFile(const wchar_t* szFile, TexMetadata* metadata, S
 
         hr = image.Initialize2D(DXGI_FORMAT_R16G16B16A16_FLOAT,
                 static_cast<size_t>(width), static_cast<size_t>(height), arraySize, 1u);
-        
+
         if (FAILED(hr))
             return hr;
 
@@ -544,7 +544,7 @@ HRESULT DirectX::SaveToEXRFile(const Image& image, const wchar_t* szFile)
         {
             const uint64_t bytes = image.width * image.height;
 
-            if (bytes > UINT32_MAX)
+            if (bytes > static_cast<uint64_t>(UINT32_MAX))
             {
                 return /* HRESULT_FROM_WIN32(ERROR_ARITHMETIC_OVERFLOW) */ static_cast<HRESULT>(0x80070216L);
             }
