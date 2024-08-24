@@ -83,7 +83,6 @@ set(LIBRARY_SOURCES
     DirectXTex/BC.h
     DirectXTex/DDS.h
     DirectXTex/DirectXTexP.h
-    DirectXTex/DirectXTexCustomized.h
     DirectXTex/filters.h
     DirectXTex/scoped.h
     DirectXTex/BC.cpp
@@ -156,7 +155,7 @@ if(BUILD_DX11 AND WIN32)
 endif()
 
 if(BUILD_DX12)
-   list(APPEND LIBRARY_SOURCES DirectXTex/DirectXTexD3D12.cpp DirectXTex/DirectXTexCustomizedD3D12.cpp)
+   list(APPEND LIBRARY_SOURCES DirectXTex/DirectXTexD3D12.cpp)
 
    if(NOT (DEFINED XBOX_CONSOLE_TARGET))
        list(APPEND LIBRARY_SOURCES DirectXTex/d3dx12.h)
