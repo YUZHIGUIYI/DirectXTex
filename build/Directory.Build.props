@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
 
+  <!--
+      Copyright (c) Microsoft Corporation.
+      Licensed under the MIT License.
+  -->
+
   <PropertyGroup>
     <ExtractedFolder Condition="'$(ExtractedFolder)'==''">C:\xtracted\</ExtractedFolder>
     <ExtractedFolder Condition="!HasTrailingSlash('$(ExtractedFolder)')">$(ExtractedFolder)\</ExtractedFolder>
@@ -11,6 +16,21 @@
 
     <!-- Workaround for VS bug -->
     <MinimumVisualStudioVersion>15.0</MinimumVisualStudioVersion>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(GDKEditionNumber)' &lt; '220300'">
+    <_PCNuGetPackage>Microsoft.PGDK</_PCNuGetPackage>
+    <_XboxNuGetPackage>Microsoft.GDK</_XboxNuGetPackage>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(GDKEditionNumber)' &gt;= '220300'">
+    <_PCNuGetPackage>Microsoft.GDK.PC</_PCNuGetPackage>
+    <_XboxNuGetPackage>Microsoft.GDK.Xbox</_XboxNuGetPackage>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(GDKEditionNumber)' &lt; '241000'">
+    <_PCNuGetPackage>$(_PCNuGetPackage).$(GDKEditionNumber)</_PCNuGetPackage>
+    <_XboxNuGetPackage>$(_XboxNuGetPackage).$(GDKEditionNumber)</_XboxNuGetPackage>
   </PropertyGroup>
 
   <!-- Windows 10 SDK NuGet -->
@@ -27,11 +47,16 @@
           Project="$(ExtractedFolder)SDK\Microsoft.Windows.SDK.cpp.arm64\build\native\Microsoft.Windows.SDK.cpp.arm64.props" />
 
   <!-- Microsoft GDK NuGet -->
-  <Import Condition="'$(GDKEnableBWOI)' == 'true' and $(Platform.Contains('x64')) and Exists('$(ExtractedFolder)GDK\Microsoft.GDK.PC.$(GDKEditionNumber)\build\Microsoft.GDK.PC.$(GDKEditionNumber).props')"
-          Project="$(ExtractedFolder)GDK\Microsoft.GDK.PC.$(GDKEditionNumber)\build\Microsoft.GDK.PC.$(GDKEditionNumber).props" />
+  <Import Condition="'$(GDKEnableBWOI)' == 'true' and $(Platform.Contains('x64')) and Exists('$(ExtractedFolder)GDK\$(_PCNuGetPackage)\build\$(_PCNuGetPackage).props')"
+          Project="$(ExtractedFolder)GDK\$(_PCNuGetPackage)\build\$(_PCNuGetPackage).props" />
 
-  <Import Condition="'$(GDKEnableBWOI)' == 'true' and $(Platform.Contains('x64'))"
-          Project="$(ExtractedFolder)GDK\Microsoft.GDK.Xbox.$(GDKEditionNumber)\build\Microsoft.GDK.Xbox.$(GDKEditionNumber).props" />
+  <Import Condition="'$(GDKEnableBWOI)' == 'true' and $(Platform.Contains('x64')) and Exists('$(ExtractedFolder)GDK\$(_XboxNuGetPackage)\build\$(_XboxNuGetPackage).props')"
+          Project="$(ExtractedFolder)GDK\$(_XboxNuGetPackage)\build\$(_XboxNuGetPackage).props" />
+
+  <!-- Remove copy of real gameos.xvd since this is a build validation only pipeline -->
+  <PropertyGroup Condition="'$(Platform)' == 'Gaming.Xbox.XboxOne.x64' or '$(Platform)' == 'Gaming.Xbox.Scarlett.x64'">
+    <GameOSFilePath>$(MSBuildThisFileDirectory)build\placeholder.xvd</GameOSFilePath>
+  </PropertyGroup>
 
   <!--
   ****************************************************************************************************
