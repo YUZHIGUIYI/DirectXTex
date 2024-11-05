@@ -3,7 +3,7 @@
 
 cmake_minimum_required (VERSION 3.20)
 
-set(DIRECTXTEX_VERSION 2.0.5)
+set(DIRECTXTEX_VERSION 2.0.6)
 
 if(WINDOWS_STORE OR (DEFINED XBOX_CONSOLE_TARGET))
   set(CMAKE_TRY_COMPILE_TARGET_TYPE "STATIC_LIBRARY")
@@ -38,6 +38,8 @@ option(ENABLE_SPECTRE_MITIGATION "Build using /Qspectre for MSVC" OFF)
 option(DISABLE_MSVC_ITERATOR_DEBUGGING "Disable iterator debugging in Debug configurations with the MSVC CRT" OFF)
 
 option(ENABLE_CODE_ANALYSIS "Use Static Code Analysis on build" OFF)
+
+option(ENABLE_CODE_COVERAGE "Build with code-coverage" OFF)
 
 option(USE_PREBUILT_SHADERS "Use externally built HLSL shaders" OFF)
 
@@ -309,7 +311,11 @@ endif()
 
 if(MINGW OR (NOT WIN32))
     find_package(directxmath CONFIG REQUIRED)
+    target_link_libraries(${PROJECT_NAME} PUBLIC Microsoft::DirectXMath)
+
     find_package(directx-headers CONFIG REQUIRED)
+    target_link_libraries(${PROJECT_NAME} PUBLIC Microsoft::DirectX-Headers)
+    target_compile_definitions(${PROJECT_NAME} PUBLIC USING_DIRECTX_HEADERS)
 else()
     find_package(directxmath CONFIG QUIET)
     find_package(directx-headers CONFIG QUIET)
@@ -317,13 +323,13 @@ endif()
 
 if(directxmath_FOUND)
     message(STATUS "Using DirectXMath package")
-    target_link_libraries(${PROJECT_NAME} PUBLIC Microsoft::DirectXMath)
+    target_link_libraries(${PROJECT_NAME} PRIVATE Microsoft::DirectXMath)
 endif()
 
 if(directx-headers_FOUND)
     message(STATUS "Using DirectX-Headers package")
-    target_link_libraries(${PROJECT_NAME} PUBLIC Microsoft::DirectX-Headers)
-    target_compile_definitions(${PROJECT_NAME} PUBLIC USING_DIRECTX_HEADERS)
+    target_link_libraries(${PROJECT_NAME} PRIVATE Microsoft::DirectX-Headers)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE USING_DIRECTX_HEADERS)
     target_compile_options(${PROJECT_NAME} PRIVATE $<$<CXX_COMPILER_ID:MSVC,Intel>:/wd4062> $<$<CXX_COMPILER_ID:Clang,IntelLLVM>:-Wno-switch-enum>)
 endif()
 
@@ -568,7 +574,7 @@ elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
 
     if((CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 19.37)
        AND (NOT (${DIRECTX_ARCH} MATCHES "^arm"))
-       AND ((${DIRECTX_ARCH} MATCHES "x64") OR (CMAKE_SIZEOF_VOID_P EQUAL 8)))
+       AND ((${DIRECTX_ARCH} STREQUAL "x64") OR (CMAKE_SIZEOF_VOID_P EQUAL 8)))
        # Enable since DirectXTex library has a lot of large switch statements
       target_compile_options(${PROJECT_NAME} PRIVATE /jumptablerdata)
     endif()
@@ -605,13 +611,16 @@ elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
       target_compile_options(${t} PRIVATE ${WarningsEXE})
     endforeach()
 
-    if(BUILD_FUZZING
-       AND (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 19.32)
-       AND (NOT WINDOWS_STORE))
-          foreach(t IN LISTS TOOL_EXES ITEMS ${PROJECT_NAME})
-            target_compile_options(${t} PRIVATE ${ASAN_SWITCHES})
-            target_link_libraries(${t} PRIVATE ${ASAN_LIBS})
-          endforeach()
+    if(BUILD_FUZZING AND (NOT WINDOWS_STORE))
+      string(REPLACE "/DNDEBUG" "" CMAKE_CXX_FLAGS_RELEASE ${CMAKE_CXX_FLAGS_RELEASE})
+      string(REPLACE "/DNDEBUG" "" CMAKE_CXX_FLAGS_RELWITHDEBINFO ${CMAKE_CXX_FLAGS_RELWITHDEBINFO})
+
+      if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 19.32)
+        foreach(t IN LISTS TOOL_EXES ITEMS ${PROJECT_NAME})
+          target_compile_options(${t} PRIVATE ${ASAN_SWITCHES})
+          target_link_libraries(${t} PRIVATE ${ASAN_LIBS})
+        endforeach()
+      endif()
     endif()
 endif()
 
@@ -656,6 +665,10 @@ if(WIN32 AND (NOT WINDOWS_STORE) AND (NOT (DEFINED XBOX_CONSOLE_TARGET)))
     if(BUILD_TESTING AND (EXISTS "${CMAKE_CURRENT_LIST_DIR}/Tests/CMakeLists.txt"))
         enable_testing()
         add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/Tests)
+
+        if(ENABLE_CODE_COVERAGE AND (DEFINED COV_COMPILER_SWITCHES))
+          target_compile_options(${PROJECT_NAME} PRIVATE ${COV_COMPILER_SWITCHES})
+        endif()
     elseif(BUILD_FUZZING AND (EXISTS "${CMAKE_CURRENT_LIST_DIR}/Tests/fuzzloaders/CMakeLists.txt"))
         message(STATUS "Building for fuzzing")
         add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/Tests/fuzzloaders)
