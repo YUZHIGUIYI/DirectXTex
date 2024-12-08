@@ -77,6 +77,11 @@ endif()
 include(GNUInstallDirs)
 include(build/CompilerAndLinker.cmake)
 
+if((DEFINED DIRECTX_ARCH) AND (${DIRECTX_ARCH} STREQUAL "arm64ec"))
+  # OpenEXR doesn't support ARM64EC
+  set(ENABLE_OPENEXR_SUPPORT OFF)
+endif()
+
 #--- Library
 set(LIBRARY_HEADERS
     DirectXTex/DirectXTex.h
@@ -538,12 +543,6 @@ foreach(t IN LISTS TOOL_EXES ITEMS ${PROJECT_NAME})
   target_compile_options(${t} PRIVATE ${COMPILER_SWITCHES})
   target_link_options(${t} PRIVATE ${LINKER_SWITCHES})
 endforeach()
-
-if(MINGW)
-    foreach(t IN LISTS TOOL_EXES)
-      target_link_options(${t} PRIVATE -municode)
-    endforeach()
-endif()
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|IntelLLVM")
     set(WarningsLib -Wall -Wpedantic -Wextra)
