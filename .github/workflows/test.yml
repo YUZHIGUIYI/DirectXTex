@@ -13,13 +13,14 @@ on:
     paths-ignore:
       - '*.md'
       - LICENSE
+      - '.azuredevops/*'
       - '.nuget/*'
       - build/*.cmd
       - build/*.json
       - build/*.props
       - build/*.ps1
       - build/*.targets
-      - build/*.yml
+      - build/*.xvd
 
 env:
   DIRECTXTEX_MEDIA_PATH: ${{ github.workspace }}/Media
@@ -152,5 +153,20 @@ jobs:
         -DVCPKG_TARGET_TRIPLET="${env:VCPKG_DEFAULT_TRIPLET}"
 
     - name: 'Build'
+      working-directory: ${{ github.workspace }}
+      run: cmake --build out\build\${{ matrix.build_type }}
+
+    - name: 'Clean up'
+      working-directory: ${{ github.workspace }}
+      run: Remove-Item -Path out -Recurse -Force
+
+    - name: 'Configure CMake (DLL)'
+      working-directory: ${{ github.workspace }}
+      run: >
+        cmake --preset=${{ matrix.build_type }} -DBUILD_TESTING=ON -DBUILD_TOOLS=OFF -DBUILD_SAMPLE=OFF -DENABLE_LIBJPEG_SUPPORT=ON -DENABLE_LIBPNG_SUPPORT=ON
+        -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake" -DVCPKG_MANIFEST_DIR="${{ github.workspace }}/build"
+        -DVCPKG_TARGET_TRIPLET="${env:VCPKG_DEFAULT_TRIPLET}" -DBUILD_SHARED_LIBS=ON
+
+    - name: 'Build (DLL)'
       working-directory: ${{ github.workspace }}
       run: cmake --build out\build\${{ matrix.build_type }}

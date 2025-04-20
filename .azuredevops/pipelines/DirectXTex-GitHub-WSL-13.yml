@@ -20,10 +20,13 @@ pr:
     - main
   paths:
     include:
+    - '.azuredevops/pipelines/DirectXTex-GitHub-WSL-13.yml'
     - CMake*
     - build/*.cmake
     - build/*.in
-    - build/DirectXTex-GitHub-WSL-11.yml
+    - Auxiliary/*EXR*
+    - Auxiliary/*JPEG*
+    - Auxiliary/*PNG*
 
 resources:
   repositories:
@@ -50,14 +53,20 @@ resources:
 name: $(Year:yyyy).$(Month).$(DayOfMonth)$(Rev:.r)
 
 pool:
-    vmImage: ubuntu-22.04
+    vmImage: ubuntu-24.04
 
 variables:
-  Codeql.Enabled: false
-  VCPKG_ROOT: $(Build.SourcesDirectory)/vcpkg
-  VCPKG_CMAKE_DIR: $(Build.SourcesDirectory)/vcpkg/scripts/buildsystems/vcpkg.cmake
-  VCPKG_MANIFEST_DIR: $(Build.SourcesDirectory)/build
-  LOCAL_PKG_DIR: '$(Agent.BuildDirectory)/install/'
+- group: dxtex-shared-variables
+- name: Codeql.Enabled
+  value: false
+- name: VCPKG_ROOT
+  value: '$(Build.SourcesDirectory)/vcpkg'
+- name: VCPKG_CMAKE_DIR
+  value: '$(Build.SourcesDirectory)/vcpkg/scripts/buildsystems/vcpkg.cmake'
+- name: VCPKG_MANIFEST_DIR
+  value: '$(Build.SourcesDirectory)/build'
+- name: LOCAL_PKG_DIR
+  value: '$(Agent.BuildDirectory)/install/'
 
 jobs:
 - job: BUILD_WSL
@@ -75,42 +84,42 @@ jobs:
     clean: true
     fetchTags: false
     fetchDepth: 1
-    path: 's/directx-headers'
+    path: 's/DirectX-Headers'
   - checkout: dxMathRepo
     displayName: Fetch DirectX-Math
     clean: true
     fetchTags: false
     fetchDepth: 1
-    path: 's/directxmath'
+    path: 's/DirectXMath'
   - task: CMake@1
     displayName: CMake DirectX-Headers
     inputs:
-      cwd: directx-headers
+      cwd: DirectX-Headers
       cmakeArgs: . -DDXHEADERS_BUILD_TEST=OFF -DDXHEADERS_BUILD_GOOGLE_TEST=OFF -DCMAKE_INSTALL_PREFIX=$(LOCAL_PKG_DIR)
   - task: CMake@1
     displayName: CMake DirectX-Headers (Build)
     inputs:
-      cwd: directx-headers
+      cwd: DirectX-Headers
       cmakeArgs: --build . -v
   - task: CMake@1
     displayName: CMake DirectX-Headers (Install)
     inputs:
-      cwd: directx-headers
+      cwd: DirectX-Headers
       cmakeArgs: --install .
   - task: CMake@1
     displayName: CMake DirectXMath
     inputs:
-      cwd: directxmath
+      cwd: DirectXMath
       cmakeArgs: . -DCMAKE_INSTALL_PREFIX=$(LOCAL_PKG_DIR)
   - task: CMake@1
     displayName: CMake DirectXMath (Build)
     inputs:
-      cwd: directxmath
+      cwd: DirectXMath
       cmakeArgs: --build . -v
   - task: CMake@1
     displayName: CMake DirectXMath (Install)
     inputs:
-      cwd: directxmath
+      cwd: DirectXMath
       cmakeArgs: --install .
   - task: PowerShell@2
     displayName: Fetch SAL.H

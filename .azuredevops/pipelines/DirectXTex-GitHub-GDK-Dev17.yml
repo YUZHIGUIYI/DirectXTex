@@ -20,12 +20,13 @@ pr:
     - main
   paths:
     include:
+    - '.azuredevops/pipelines/DirectXTex-GitHub-GDK-Dev17.yml'
     - CMakeList.txt
-    - build/DirectXTex-GitHub-GDK-Dev17.yml
     - build/*.in
     - build/*.cmake
     - build/SetupBWOI.*
     - DirectXTex/Shaders/CompileShaders.cmd
+    - Auxiliary/*Xbox*
 
 resources:
   repositories:
@@ -40,13 +41,17 @@ pool:
   vmImage: windows-2022
 
 variables:
-  Codeql.Enabled: false
-  EXTRACTED_FOLDER: $(ExtractedFolder)
-  GDK_EDITION: $(GDKEditionNumber)
-  GDKEnableBWOI: true
-  URL_FEED: $(ADOFeedURL)
-  VC_PATH: 'C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC'
-  skipNugetSecurityAnalysis: true # We explicitly call this task so we don't need it to be auto-injected
+- group: dxtex-shared-variables
+- name: Codeql.Enabled
+  value: false
+- name: EXTRACTED_FOLDER
+  value: '$(ExtractedFolder)'
+- name: GDKEnableBWOI
+  value: true
+- name: URL_FEED
+  value: $(ADOFeedURL)
+- name: skipNugetSecurityAnalysis
+  value: true # We explicitly call this task so we don't need it to be auto-injected
 
 jobs:
 - job: BUILD_GDK
@@ -106,6 +111,7 @@ jobs:
       solution: build/SetupBWOI.targets
       msbuildVersion: 17.0
       msbuildArchitecture: x64
+      msbuildArguments: /p:GDKEditionNumber=$(GDK_EDITION)
   - task: VSBuild@1
     displayName: Build solution DirectXTex_GDK_2022 pcdbg
     continueOnError: True
@@ -115,6 +121,7 @@ jobs:
       platform: Gaming.Desktop.x64
       configuration: Debug
       msbuildArchitecture: x64
+      msbuildArgs: /p:GDKEditionNumber=$(GDK_EDITION)
   - task: VSBuild@1
     displayName: Build solution DirectXTex_GDK_2022 pcrel
     continueOnError: True
@@ -124,6 +131,7 @@ jobs:
       platform: Gaming.Desktop.x64
       configuration: Release
       msbuildArchitecture: x64
+      msbuildArgs: /p:GDKEditionNumber=$(GDK_EDITION)
   - task: VSBuild@1
     displayName: Build solution DirectXTex_GDK_2022 xbdbg
     continueOnError: True
@@ -133,6 +141,7 @@ jobs:
       platform: Gaming.Xbox.XboxOne.x64
       configuration: Debug
       msbuildArchitecture: x64
+      msbuildArgs: /p:GDKEditionNumber=$(GDK_EDITION)
   - task: VSBuild@1
     displayName: Build solution DirectXTex_GDK_2022 xbrel
     continueOnError: True
@@ -142,6 +151,7 @@ jobs:
       platform: Gaming.Xbox.XboxOne.x64
       configuration: Release
       msbuildArchitecture: x64
+      msbuildArgs: /p:GDKEditionNumber=$(GDK_EDITION)
   - task: VSBuild@1
     displayName: Build solution DirectXTex_GDK_2022 scardbg
     continueOnError: True
@@ -151,6 +161,7 @@ jobs:
       platform: Gaming.Xbox.Scarlett.x64
       configuration: Debug
       msbuildArchitecture: x64
+      msbuildArgs: /p:GDKEditionNumber=$(GDK_EDITION)
   - task: VSBuild@1
     displayName: Build solution DirectXTex_GDK_2022 scarrel
     continueOnError: True
@@ -160,6 +171,7 @@ jobs:
       platform: Gaming.Xbox.Scarlett.x64
       configuration: Release
       msbuildArchitecture: x64
+      msbuildArgs: /p:GDKEditionNumber=$(GDK_EDITION)
   - task: VSBuild@1
     displayName: Build solution DirectXTex_GDK_PC_2022 dbg
     continueOnError: True
@@ -170,6 +182,7 @@ jobs:
       platform: x64
       configuration: Debug
       msbuildArchitecture: x64
+      msbuildArgs: /p:GDKEditionNumber=$(GDK_EDITION)
   - task: VSBuild@1
     displayName: Build solution DirectXTex_GDK_PC_2022 rel
     continueOnError: True
@@ -180,6 +193,7 @@ jobs:
       platform: x64
       configuration: Release
       msbuildArchitecture: x64
+      msbuildArgs: /p:GDKEditionNumber=$(GDK_EDITION)
   - task: VSBuild@1
     displayName: Build solution DirectXTex_GDK_PC_2022 scardbg
     continueOnError: True
@@ -190,6 +204,7 @@ jobs:
       platform: x64
       configuration: Debug_Scarlett
       msbuildArchitecture: x64
+      msbuildArgs: /p:GDKEditionNumber=$(GDK_EDITION)
   - task: VSBuild@1
     displayName: Build solution DirectXTex_GDK_PC_2022 scarrel
     continueOnError: True
@@ -200,6 +215,7 @@ jobs:
       platform: x64
       configuration: Release_Scarlett
       msbuildArchitecture: x64
+      msbuildArgs: /p:GDKEditionNumber=$(GDK_EDITION)
 
 - job: BUILD_GDK_CMAKE_SCAR
   displayName: 'Microsoft Game Development Kit (GDK) using CMake (Scarlett)'
@@ -306,6 +322,19 @@ jobs:
     inputs:
       cwd: '$(Build.SourcesDirectory)'
       cmakeArgs: --build out\build\x64-Release-Scarlett-Clang
+  - task: DeleteFiles@1
+    inputs:
+      Contents: 'out/build'
+  - task: CMake@1
+    displayName: 'CMake (DLL): Config Scarlett Debug'
+    inputs:
+      cwd: '$(Build.SourcesDirectory)'
+      cmakeArgs: --preset=x64-Debug-Scarlett -DBUILD_SHARED_LIBS=ON
+  - task: CMake@1
+    displayName: 'CMake (DLL): Build Scarlett Debug'
+    inputs:
+      cwd: '$(Build.SourcesDirectory)'
+      cmakeArgs: --build out\build\x64-Debug-Scarlett
 
 - job: BUILD_GDK_CMAKE_XBONE
   displayName: 'Microsoft Game Development Kit (GDK) using CMake (XboxOne)'
@@ -412,3 +441,16 @@ jobs:
     inputs:
       cwd: '$(Build.SourcesDirectory)'
       cmakeArgs: --build out\build\x64-Release-XboxOne-Clang
+  - task: DeleteFiles@1
+    inputs:
+      Contents: 'out/build'
+  - task: CMake@1
+    displayName: 'CMake (DLL): Config XboxOne Debug'
+    inputs:
+      cwd: '$(Build.SourcesDirectory)'
+      cmakeArgs: --preset=x64-Debug-XboxOne -DBUILD_SHARED_LIBS=ON
+  - task: CMake@1
+    displayName: 'CMake (DLL): Build XboxOne Debug'
+    inputs:
+      cwd: '$(Build.SourcesDirectory)'
+      cmakeArgs: --build out\build\x64-Debug-XboxOne

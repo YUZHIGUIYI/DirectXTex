@@ -13,13 +13,14 @@ on:
     paths-ignore:
       - '*.md'
       - LICENSE
+      - '.azuredevops/*'
       - '.nuget/*'
       - build/*.cmd
       - build/*.json
       - build/*.props
       - build/*.ps1
       - build/*.targets
-      - build/*.yml
+      - build/*.xvd
 
 permissions:
   contents: read
@@ -103,6 +104,10 @@ jobs:
       working-directory: ${{ github.workspace }}
       run: cmake --build out\build\${{ matrix.build_type }}
 
+    - name: 'Clean up'
+      working-directory: ${{ github.workspace }}
+      run: Remove-Item -Path out -Recurse -Force
+
     - if: matrix.arch != 'amd64_arm64'
       name: 'Configure CMake (Spectre)'
       working-directory: ${{ github.workspace }}
@@ -110,5 +115,18 @@ jobs:
 
     - if: matrix.arch != 'amd64_arm64'
       name: 'Build (Spectre)'
+      working-directory: ${{ github.workspace }}
+      run: cmake --build out\build\${{ matrix.build_type }}
+
+    - if: matrix.arch != 'amd64_arm64'
+      name: 'Clean up'
+      working-directory: ${{ github.workspace }}
+      run: Remove-Item -Path out -Recurse -Force
+
+    - name: 'Configure CMake (DLL)'
+      working-directory: ${{ github.workspace }}
+      run: cmake --preset=${{ matrix.build_type }} -DBUILD_SHARED_LIBS=ON
+
+    - name: 'Build (DLL)'
       working-directory: ${{ github.workspace }}
       run: cmake --build out\build\${{ matrix.build_type }}
