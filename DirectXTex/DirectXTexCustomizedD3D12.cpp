@@ -137,6 +137,7 @@ namespace DirectX
         commandList->ResourceBarrier(static_cast<uint32_t>(barrierStorage.size()), barrierStorage.data());
     }
 
+    // Core functions
     _Use_decl_annotations_
     HRESULT __cdecl CaptureTextureDeferred(
             _In_ ID3D12Device* device, _In_ ID3D12GraphicsCommandList* pCommandList, _In_ ID3D12Resource* pSource,
@@ -340,7 +341,7 @@ namespace DirectX
             {
                 fakeResourceDesc.Width = std::max(static_cast<uint64_t>(desc.Width >> rtvDesc.Texture1DArray.MipSlice), 1ull);
                 fakeResourceDesc.MipLevels = 1u;
-                fakeResourceDesc.DepthOrArraySize = rtvDesc.Texture1DArray.ArraySize;
+                fakeResourceDesc.DepthOrArraySize = static_cast<uint16_t>(rtvDesc.Texture1DArray.ArraySize);
                 captureTextureDesc.numberOfResources = rtvDesc.Texture1DArray.ArraySize;
                 subresourceIndexStorage.reserve(captureTextureDesc.numberOfResources);
                 for (uint32_t i = 0u; i < captureTextureDesc.numberOfResources; ++i)
@@ -366,7 +367,7 @@ namespace DirectX
                 fakeResourceDesc.Width = std::max(static_cast<uint64_t>(desc.Width >> rtvDesc.Texture2DArray.MipSlice), 1ull);
                 fakeResourceDesc.Height = std::max(static_cast<uint32_t>(desc.Height >> rtvDesc.Texture2DArray.MipSlice), 1u);
                 fakeResourceDesc.MipLevels = 1u;
-                fakeResourceDesc.DepthOrArraySize = rtvDesc.Texture2DArray.ArraySize;
+                fakeResourceDesc.DepthOrArraySize = static_cast<uint16_t>(rtvDesc.Texture2DArray.ArraySize);
                 captureTextureDesc.numberOfResources = rtvDesc.Texture2DArray.ArraySize;
                 subresourceIndexStorage.reserve(captureTextureDesc.numberOfResources);
                 for (uint32_t i = 0u; i < captureTextureDesc.numberOfResources; ++i)
@@ -389,7 +390,7 @@ namespace DirectX
             case D3D12_RTV_DIMENSION_TEXTURE2DMSARRAY:
             {
                 fakeResourceDesc.MipLevels = 1u;
-                fakeResourceDesc.DepthOrArraySize = rtvDesc.Texture2DMSArray.ArraySize;
+                fakeResourceDesc.DepthOrArraySize = static_cast<uint16_t>(rtvDesc.Texture2DMSArray.ArraySize);
                 fakeResourceDesc.SampleDesc = DXGI_SAMPLE_DESC{ 1u, 0u };
                 fakeResourceDesc.Alignment = D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT;
                 captureTextureDesc.numberOfResources = rtvDesc.Texture2DMSArray.ArraySize;
@@ -408,7 +409,7 @@ namespace DirectX
                 fakeResourceDesc.Height = std::max(static_cast<uint32_t>(desc.Height >> rtvDesc.Texture3D.MipSlice), 1u);
                 fakeResourceDesc.DepthOrArraySize = std::max(static_cast<uint16_t>(desc.DepthOrArraySize >> rtvDesc.Texture3D.MipSlice), static_cast<uint16_t>(1u));
                 fakeResourceDesc.MipLevels = 1u;
-                fakeResourceDesc.DepthOrArraySize = rtvDesc.Texture3D.WSize;
+                fakeResourceDesc.DepthOrArraySize = static_cast<uint16_t>(rtvDesc.Texture3D.WSize);
                 captureTextureDesc.numberOfResources = rtvDesc.Texture3D.WSize;
                 subresourceIndexStorage.reserve(captureTextureDesc.numberOfResources);
                 for (uint32_t i = 0u; i < captureTextureDesc.numberOfResources; ++i)
@@ -566,21 +567,14 @@ namespace DirectX
     }
 
     _Use_decl_annotations_
-    HRESULT SaveToDDSFileImmediately(_In_ const CaptureTextureDesc& captureTextureDesc, _In_ DDS_FLAGS flags, _In_z_ const wchar_t* szFile) noexcept
+    HRESULT GetScratchImageFromCapturedTexture(_In_ const CaptureTextureDesc &captureTextureDesc, _Out_ ScratchImage &scratchImageResult, _Out_ TexMetadata &texMetadataCache)
     {
-        if (!captureTextureDesc.pStaging || !captureTextureDesc.layoutBuff)
-        {
-            return E_INVALIDARG;
-        }
-
-        // Mapping staging resource
         HRESULT hr = S_OK;
         auto *pLayout = reinterpret_cast<const D3D12_PLACED_SUBRESOURCE_FOOTPRINT *>(captureTextureDesc.layoutBuff.get());
         auto *pRowSizesInBytes = reinterpret_cast<const UINT64 *>(pLayout + captureTextureDesc.numberOfResources);
         auto *pNumRows = reinterpret_cast<const UINT *>(pRowSizesInBytes + captureTextureDesc.numberOfResources);
         auto desc = captureTextureDesc.capturedResourceDesc;
-        ScratchImage result{};
-        TexMetadata texMetadataCache{};
+
         switch (desc.Dimension)
         {
             case D3D12_RESOURCE_DIMENSION_TEXTURE1D:
@@ -596,7 +590,7 @@ namespace DirectX
                 mdata.dimension = TEX_DIMENSION_TEXTURE1D;
                 texMetadataCache = mdata;
 
-                hr = result.Initialize(mdata);
+                hr = scratchImageResult.Initialize(mdata);
                 if (FAILED(hr))
                 {
                     return hr;
@@ -618,7 +612,7 @@ namespace DirectX
                 mdata.dimension = TEX_DIMENSION_TEXTURE2D;
                 texMetadataCache = mdata;
 
-                hr = result.Initialize(mdata);
+                hr = scratchImageResult.Initialize(mdata);
                 if (FAILED(hr))
                 {
                     return hr;
@@ -640,7 +634,7 @@ namespace DirectX
                 mdata.dimension = TEX_DIMENSION_TEXTURE3D;
                 texMetadataCache = mdata;
 
-                hr = result.Initialize(mdata);
+                hr = scratchImageResult.Initialize(mdata);
                 if (FAILED(hr))
                 {
                     return hr;
@@ -649,14 +643,16 @@ namespace DirectX
             }
 
             default:
+            {
                 return E_FAIL;
+            }
         }
 
         BYTE* pData = nullptr;
         hr = captureTextureDesc.pStaging->Map(0, nullptr, reinterpret_cast<void **>(&pData));
         if (FAILED(hr))
         {
-            result.Release();
+            scratchImageResult.Release();
             return E_FAIL;
         }
 
@@ -670,18 +666,18 @@ namespace DirectX
                     const UINT dindex = D3D12CalcSubresource(level, item, plane, desc.MipLevels, arraySize);
                     assert(dindex < captureTextureDesc.numberOfResources);
 
-                    const Image* img = result.GetImage(level, item, 0);
+                    const Image* img = scratchImageResult.GetImage(level, item, 0);
                     if (!img)
                     {
                         captureTextureDesc.pStaging->Unmap(0, nullptr);
-                        result.Release();
+                        scratchImageResult.Release();
                         return E_FAIL;
                     }
 
                     if (!img->pixels)
                     {
                         captureTextureDesc.pStaging->Unmap(0, nullptr);
-                        result.Release();
+                        scratchImageResult.Release();
                         return E_POINTER;
                     }
 
@@ -694,10 +690,10 @@ namespace DirectX
                                     static_cast<LONG_PTR>(pLayout[dindex].Footprint.RowPitch),
                                     static_cast<LONG_PTR>(pLayout[dindex].Footprint.RowPitch) * static_cast<LONG_PTR>(pNumRows[dindex]) };
 
-                    if (pRowSizesInBytes[dindex] > SIZE_T(-1))
+                    if (pRowSizesInBytes[dindex] > static_cast<SIZE_T>(-1))
                     {
                         captureTextureDesc.pStaging->Unmap(0, nullptr);
-                        result.Release();
+                        scratchImageResult.Release();
                         return E_FAIL;
                     }
 
@@ -711,10 +707,32 @@ namespace DirectX
 
         captureTextureDesc.pStaging->Unmap(0, nullptr);
 
-        // Save to dds file
-        SaveToDDSFile(result.GetImages(), captureTextureDesc.numberOfResources, texMetadataCache, flags, szFile);
-
         return S_OK;
+    }
+
+    _Use_decl_annotations_
+    HRESULT SaveToDDSFileImmediately(_In_ const CaptureTextureDesc& captureTextureDesc, _In_ DDS_FLAGS flags, _In_z_ const wchar_t* szFile) noexcept
+    {
+        if (!captureTextureDesc.pStaging || !captureTextureDesc.layoutBuff)
+        {
+            return E_INVALIDARG;
+        }
+
+        // Mapping staging resource
+        HRESULT result = S_OK;
+        ScratchImage scratchImageResult{};
+        TexMetadata texMetadataCache{};
+
+        result = GetScratchImageFromCapturedTexture(captureTextureDesc, scratchImageResult, texMetadataCache);
+        if (FAILED(result))
+        {
+            return result;
+        }
+
+        // Save to dds file
+        result = SaveToDDSFile(scratchImageResult.GetImages(), captureTextureDesc.numberOfResources, texMetadataCache, flags, szFile);
+
+        return result;
     }
 
     _Use_decl_annotations_
@@ -802,6 +820,33 @@ namespace DirectX
         // Transition the resource to the next state
         TransitionResource(pCommandList, pSource, D3D12_RESOURCE_STATE_COPY_SOURCE, afterState);
 
+        return result;
+    }
+
+    _Use_decl_annotations_
+    HRESULT __cdecl SaveToWICFileImmediately(_In_ const CaptureTextureDesc &captureTextureDesc, _In_ WIC_FLAGS flags, _In_ REFGUID guidContainerFormat,
+                                        _In_z_ const wchar_t *szFile, _In_opt_ const GUID *targetFormat,
+                                        _In_ std::function<void __cdecl(IPropertyBag2*)> setCustomProps) noexcept
+    {
+        if (!captureTextureDesc.pStaging || !captureTextureDesc.layoutBuff)
+        {
+            return E_INVALIDARG;
+        }
+
+        // Mapping staging resource
+        HRESULT result = S_OK;
+        ScratchImage scratchImageResult{};
+        TexMetadata texMetadataCache{};
+
+        result = GetScratchImageFromCapturedTexture(captureTextureDesc, scratchImageResult, texMetadataCache);
+        if (FAILED(result))
+        {
+            return result;
+        }
+
+        // Save to wic-format file
+        result = SaveToWICFile(scratchImageResult.GetImages(), captureTextureDesc.numberOfResources, flags, guidContainerFormat,
+                                szFile, targetFormat, std::move(setCustomProps));
         return result;
     }
 
@@ -968,7 +1013,7 @@ namespace DirectX
         std::ofstream output_file{ szFile, std::ios::binary };
         if (output_file.is_open())
         {
-            output_file.write(reinterpret_cast<char *>(mapped_data), static_cast<std::streamsize>(stagingResourceDesc.Width));
+            output_file.write(static_cast<char *>(mapped_data), static_cast<std::streamsize>(stagingResourceDesc.Width));
         } else
         {
             result = E_ACCESSDENIED;

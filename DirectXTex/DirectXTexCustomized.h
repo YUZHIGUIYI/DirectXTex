@@ -52,4 +52,9 @@ namespace DirectX
 
     // Dump staging buffer data as a binary file, must firstly invoke CaptureBufferDeferred function and wait for the commands to finish executing.
     HRESULT __cdecl SaveToBinFileImmediately(_In_ const CaptureTextureDesc &captureTextureDesc, _In_z_ const wchar_t *szFile) noexcept;
+
+    // Dump staging buffer data as a wic-format file, must firstly invoke CaptureTextureDeferred function and wait for the commands to finish executing.
+    HRESULT __cdecl SaveToWICFileImmediately(_In_ const CaptureTextureDesc &captureTextureDesc, _In_ WIC_FLAGS flags, _In_ REFGUID guidContainerFormat,
+                                        _In_z_ const wchar_t *szFile, _In_opt_ const GUID *targetFormat = nullptr,
+                                        _In_ std::function<void __cdecl(IPropertyBag2*)> setCustomProps = nullptr) noexcept;
 }
