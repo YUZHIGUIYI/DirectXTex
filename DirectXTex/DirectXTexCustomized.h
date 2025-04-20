@@ -5,6 +5,7 @@
 #pragma once
 
 #include "DirectXTex.h"
+#include <wrl/client.h>
 
 namespace DirectX
 {
